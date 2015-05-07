@@ -382,17 +382,20 @@ buffer temporarily read-only. If macrostep-mode is active and the
 form following point is not a macro form, search forward in the
 buffer and expand the next macro form found, if any."
   (interactive)
-  (let ((sexp (macrostep-sexp-at-point))
-        (macrostep-environment (macrostep-environment-at-point)))
-    (when (not (macrostep-macro-form-p sexp))
-      (condition-case nil
-	  (progn
-	    (macrostep-next-macro)
-	    (setq sexp (macrostep-sexp-at-point)))
-	(error
-	 (if (consp sexp)
-	     (error "(%s ...) is not a macro form" (car sexp))
-	   (error "Text at point is not a macro form.")))))
+  ;; [LBO] in this SLIME version, sexp is a string.
+  (let ((sexp (slime-sexp-at-point) ;; (macrostep-sexp-at-point)
+              )
+        ;; (macrostep-environment (macrostep-environment-at-point))
+        )
+    ;; (when (not (macrostep-macro-form-p sexp))
+    ;;   (condition-case nil
+    ;;       (progn
+    ;;         (macrostep-next-macro)
+    ;;         (setq sexp (macrostep-sexp-at-point)))
+    ;;     (error
+    ;;      (if (consp sexp)
+    ;;          (error "(%s ...) is not a macro form" (car sexp))
+    ;;        (error "Text at point is not a macro form.")))))
 
     ;; Create a dedicated macro-expansion buffer and copy the text to
     ;; be expanded into it, if required
@@ -411,7 +414,13 @@ buffer and expand the next macro form found, if any."
         (pop-to-buffer buffer)))
     
     (let* ((inhibit-read-only t)
-	   (expansion (macrostep-expand-1 sexp))
+           ;; [LBO] SLIME usually does this sort of thing
+           ;; asynchronously (see `slime-expand-1') but the
+           ;; synchronous version is easier for now. `expansion' is a
+           ;; string.
+	   (expansion (slime-eval `(swank:swank-macroexpand-1 ,(slime-sexp-at-point)))
+             ;; (macrostep-expand-1 sexp)
+                      )
 	   (existing-ol (macrostep-overlay-at-point))
 	   (macrostep-gensym-depth macrostep-gensym-depth)
 	   (macrostep-gensyms-this-level nil)
@@ -430,7 +439,7 @@ buffer and expand the next macro form found, if any."
 
       (with-silent-modifications
         (atomic-change-group
-          (macrostep-replace-sexp-at-point expansion)
+          (macrostep-replace-sexp-at-point expansion t)
           (let ((new-ol
                  (make-overlay (point)
                                (scan-sexps (point) 1))))
